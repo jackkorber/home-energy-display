@@ -1,0 +1,4 @@
+src/secrets.h
+settings.env
+.pio/
+.DS_Store
