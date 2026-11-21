@@ -4,12 +4,13 @@
 #include <math.h>
 #include <time.h>
 
-// A closed month (or loaded from Netzero), with that month's LUMA price
+// A closed month (or loaded from Netzero), with that month's power company prices
 struct MonthRec {
   uint32_t key;  // YYYYMM
   float solar, home, imp, exp;  // kWh
   float rate, fixed;            // $/kWh and that month's fixed charge
   uint8_t from;                 // 1 = full month; otherwise, day counting started from
+  float sell;                   // $/kWh sold (records saved before this field existed: same as rate)
 };
 constexpr int MAX_HIST = 24;
 
@@ -17,7 +18,7 @@ constexpr int MAX_HIST = 24;
 struct VppRec {
   uint32_t key;     // YYYYMM
   uint16_t events;
-  float kwh;        // sent to LUMA during events
+  float kwh;        // sent to the grid during events
   time_t last_at;   // start of the last event (0 = unknown)
   float last_kwh;
 };
@@ -28,10 +29,10 @@ struct Energy {
   GwStatus status = GwStatus::STARTING;
   uint32_t at = 0;        // millis() of the last good reading
   float pct = NAN;        // battery on the app's scale
-  int8_t grid = -1;       // 1 = LUMA connected, 0 = outage (island), -1 = unknown
+  int8_t grid = -1;       // 1 = grid connected, 0 = outage (island), -1 = unknown
   float solar_w = NAN, home_w = NAN;
   float battery_w = NAN;  // + discharging, - charging
-  float grid_w = NAN;     // + buying from LUMA, - selling
+  float grid_w = NAN;     // + buying from the grid, - selling
   float usable_wh = NAN;  // energy left to use
   float home_avg_w = NAN; // home consumption, averaged (~10 min)
   float net_avg_w = NAN;  // home minus solar, averaged (~10 min)
@@ -45,7 +46,7 @@ struct Energy {
   MonthRec hist[MAX_HIST];  // previous months, oldest to newest
   // VPP
   bool vpp_active = false;   // event in progress
-  float vpp_w = NAN;         // what the battery is sending to LUMA now (W)
+  float vpp_w = NAN;         // what the battery is sending to the grid now (W)
   float vpp_event_kwh = 0;   // sent during the current event
   bool gs_active = false;    // Gateway's grid_services_active (for comparison only)
   VppRec vpp;                // current month (key 0 = no data yet)

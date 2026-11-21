@@ -101,12 +101,19 @@ void loadHist() {
       const uint32_t key = y * 100 + m;
       histKey(k, key);
       MonthRec r;
-      if (histPrefs.isKey(k) && histPrefs.getBytes(k, &r, sizeof(r)) == sizeof(r)) addToModel(r);
+      if (!histPrefs.isKey(k)) continue;
+      // Records saved before the "sell" field existed are shorter: same price for selling as for buying
+      const size_t len = histPrefs.getBytesLength(k);
+      if (len == sizeof(r) && histPrefs.getBytes(k, &r, sizeof(r)) == sizeof(r)) addToModel(r);
+      else if (len == offsetof(MonthRec, sell) && histPrefs.getBytes(k, &r, sizeof(r)) == len) {
+        r.sell = r.rate;
+        addToModel(r);
+      }
     }
   LOGF("[hist] %d months stored\n", E.n_hist);
 }
 
-// ---- VPP: detect events from the power the battery sends to LUMA; save per month in NVS ("vpp")
+// ---- VPP: detect events from the power the battery sends to the grid; save per month in NVS ("vpp")
 Preferences vppPrefs;
 QueueHandle_t vppQ = nullptr;
 uint32_t vppStartAt = 0, vppLowAt = 0, vppLastSave = 0, vppLastT = 0;
@@ -183,7 +190,7 @@ void vppMonth(uint32_t key) {
 }
 
 void vppDetect(uint32_t now) {
-  // What leaves the battery and the house doesn't use (after solar) goes to LUMA
+  // What leaves the battery and the house doesn't use (after solar) goes to the grid
   float b2g = 0;
   if (isfinite(E.battery_w) && isfinite(E.home_w) && isfinite(E.solar_w) && E.grid == 1 && E.battery_w > 0)
     b2g = max(0.0f, E.battery_w - max(0.0f, E.home_w - E.solar_w));
@@ -251,7 +258,7 @@ void updateMonth(const double cnt[C_N]) {
   if (reset) {
     // New month: if the old baseline was from the previous month, the month starts complete; otherwise from today
     const uint32_t prev = tm.tm_mon == 0 ? (tm.tm_year + 1899) * 100 + 12 : key - 1;
-    // Close the finished month and save it to history (with the current LUMA price)
+    // Close the finished month and save it to history (with the current prices)
     bool counterOk = true;
     for (int i = 0; i < C_N; i++) counterOk &= cnt[i] >= baseWh[i];
     if (baseMonth == prev && counterOk) {
@@ -261,8 +268,9 @@ void updateMonth(const double cnt[C_N]) {
       r.home = (cnt[C_HOME] - baseWh[C_HOME]) / 1000.0;
       r.imp = (cnt[C_IMP] - baseWh[C_IMP]) / 1000.0;
       r.exp = (cnt[C_EXP] - baseWh[C_EXP]) / 1000.0;
-      r.rate = LUMA_RATE;
-      r.fixed = LUMA_FIXED;
+      r.rate = ENERGY_RATE;
+      r.fixed = FIXED_CHARGE;
+      r.sell = SELL_RATE;
       r.from = baseFrom;
       storeHist(r);
     }
@@ -408,7 +416,7 @@ void gwPoll() {
     E.battery_w = d["battery"]["instant_power"] | NAN;
     E.home_w = d["load"]["instant_power"] | NAN;
     E.solar_w = d["solar"]["instant_power"] | NAN;
-    // Lifetime counters (Wh): solar production, home consumption (including the car), import from and export to LUMA
+    // Lifetime counters (Wh): solar production, home consumption (including the car), grid import and export
     const double cnt[C_N] = {d["solar"]["energy_exported"] | 0.0, d["load"]["energy_imported"] | 0.0,
                              d["site"]["energy_imported"] | 0.0, d["site"]["energy_exported"] | 0.0};
     updateMonth(cnt);
@@ -431,11 +439,11 @@ void gwPoll() {
     JsonDocument d;
     if (deserializeJson(d, s) == DeserializationError::Ok) {
       const char *g = d["grid_status"] | "";
-      // SystemGridConnected = LUMA; SystemIslanded* / TransitionToIsland / MicroGridFaulted = outage
+      // SystemGridConnected = on grid; SystemIslanded* / TransitionToIsland / MicroGridFaulted = outage
       E.gs_active = d["grid_services_active"] | false;
       if (E.gs_active != gsWas) {
         gsWas = E.gs_active;
-        LOGF("[vpp] grid_services_active=%d (battery %.0f W, LUMA %.0f W)\n", gsWas, E.battery_w, E.grid_w);
+        LOGF("[vpp] grid_services_active=%d (battery %.0f W, grid %.0f W)\n", gsWas, E.battery_w, E.grid_w);
       }
       if (!strcmp(g, "SystemGridConnected") || !strcmp(g, "SystemTransitionToGrid")) E.grid = 1;
       else if (strstr(g, "Island") || strstr(g, "MicroGrid")) E.grid = 0;
@@ -468,7 +476,9 @@ void gwPoll() {
   ema(E.home_avg_w, E.home_w, dt, 600);
   if (isfinite(E.home_w) && isfinite(E.solar_w)) ema(E.net_avg_w, E.home_w - E.solar_w, dt, 600);
 
+#if VPP_ENABLED
   vppDetect(now);
+#endif
   gwFails = 0;
   E.status = GwStatus::OK;
   E.at = now;

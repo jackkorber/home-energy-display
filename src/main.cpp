@@ -123,6 +123,7 @@ static void handleSerial() {
       if (sscanf(buf + 1, "%lu %f %f %f %f %f %f", &key, &r.solar, &r.home, &r.imp, &r.exp, &r.rate, &r.fixed) == 7) {
         r.key = key;
         r.from = 1;
+        r.sell = r.rate;  // net metering: sold at the same price
         net::save_history(r);
       }
       continue;

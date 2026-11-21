@@ -1,4 +1,4 @@
-# Home Energy Display (Powerwall · LUMA · VPP · Weather)
+# Home Energy Display (Powerwall · Bill · VPP · Weather)
 
 [![Buy me a coffee / Invítame un café](https://img.shields.io/badge/☕_Buy_me_a_coffee-Invítame_un_café-ffdd00?logo=paypal&logoColor=003087)](https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=jackkorber%40me.com&item_name=%E2%98%95+Coffee+for+HgYperDrive&currency_code=USD&no_note=1)
 
@@ -10,9 +10,9 @@ A round AMOLED desk display for homes in Puerto Rico with a Tesla Powerwall: bat
 
 | | |
 |---|---|
-| **Energía** | Battery %, LUMA connected / **APAGÓN**, backup time left, active NWS alert. Swipe up for **Ahora**: live solar, home, battery and grid power. |
-| **Mes** | This month's solar, home use, kWh bought from / sold to LUMA and the estimated bill or credit (net metering). Swipe up/down for past months. |
-| **VPP** | Battery-sharing events this month, kWh sent to LUMA and $ earned. Swipe up/down for past months. |
+| **Energía** | Battery %, grid connected (shows your power company, e.g. **LUMA**) / **APAGÓN**, backup time left, active NWS alert. Swipe up for **Ahora**: live solar, home, battery and grid power. |
+| **Mes** | This month's solar, home use, kWh bought from / sold to the power company and the estimated bill or credit. Swipe up/down for past months. |
+| **VPP** *(optional)* | Battery-sharing events this month, kWh sent to the grid and $ earned. Swipe up/down for past months. Turn it off with `VPP="no"`. |
 | **Tiempo** | Temperature, forecast, NWS alerts (translated to Spanish) and the nearest tropical storm from the NHC. |
 
 Sounds when the power goes out / comes back and for new NWS warnings. At night (10 pm–7 am) the screen turns off unless there is an outage or a serious alert; touch to wake it.
@@ -48,11 +48,22 @@ POWERWALLS="2"
 
 > Too many wrong Gateway passwords lock the Gateway for a while. The display backs off for 10 minutes after a failed login.
 
-## LUMA price / Precio de LUMA
+## Power company and prices / Compañía y precios
 
-LUMA's price changes **every quarter**. The default is Oct–Dec 2026: **32.86 ¢/kWh + $8 fixed** (the Energy Bureau's 800 kWh model bill of $270.86). Update `LUMA_RATE` and `LUMA_FIXED` when it changes and run `./install.sh` again. With net metering, a month where you sell more than you buy shows as a **credit**: LUMA keeps it on your account; your bill is never below the fixed charge.
+Set these at the top of `install.sh` (or in `settings.env`) and run `./install.sh` again whenever they change:
 
-The VPP rate defaults to **$1.00 per kWh** sent during an event (`VPP_RATE`).
+| Setting | Default | Meaning |
+|---|---|---|
+| `UTILITY_NAME` | `LUMA` | Name shown on screen ("Comprando a LUMA", "a pagar a LUMA"…). Short, plain ASCII. |
+| `ENERGY_RATE` | `0.3286` | $ per kWh you buy. |
+| `FIXED_CHARGE` | `8` | Fixed monthly charge ($). |
+| `SELL_RATE` | *(same as `ENERGY_RATE`)* | $ per kWh you sell. Leave empty for net metering; set it if your company pays less for exports. |
+| `VPP` | `yes` | `no` hides the VPP screen and turns off event detection. |
+| `VPP_RATE` | `1.00` | $ per kWh your battery sends during a VPP event. |
+
+**LUMA (Puerto Rico):** the price changes **every quarter**. The default is Oct–Dec 2026: **32.86 ¢/kWh + $8 fixed** (the Energy Bureau's 800 kWh model bill of $270.86). With net metering, a month where you sell more than you buy shows as a **credit**: LUMA keeps it on your account, and your bill is never below the fixed charge. The LUMA VPP (*Customer Battery Energy Sharing*) pays about **$1 per kWh** sent during an event.
+
+*Pon tu compañía y precios arriba en `install.sh` (o en `settings.env`) y vuelve a correr `./install.sh` cuando cambien. `VPP="no"` quita la pantalla de VPP.*
 
 ## How VPP events are detected / Cómo se detectan los eventos VPP
 
@@ -76,7 +87,7 @@ The Powerwall data never leaves your home network. The only internet requests ar
 
 ## Credits / Créditos
 
-Not affiliated with Tesla or LUMA. Local API knowledge from [pypowerwall](https://github.com/jasonacox/pypowerwall) and [vloschiavo/powerwall2](https://github.com/vloschiavo/powerwall2). Includes [SensorLib](https://github.com/lewisxhe/SensorsLib) (MIT) and Montserrat fonts (SIL OFL). Built with [LVGL](https://lvgl.io).
+Not affiliated with Tesla, LUMA or any power company. Local API knowledge from [pypowerwall](https://github.com/jasonacox/pypowerwall) and [vloschiavo/powerwall2](https://github.com/vloschiavo/powerwall2). Includes [SensorLib](https://github.com/lewisxhe/SensorsLib) (MIT) and Montserrat fonts (SIL OFL). Built with [LVGL](https://lvgl.io).
 
 ## ☕ Support / Apoyo
 

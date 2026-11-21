@@ -25,17 +25,35 @@
 #define BATTERY_KWH 13.5f
 #endif
 
-// LUMA net metering: imported and exported kWh are counted at the same price.
-// Oct-Dec 2026 (Energy Bureau): 33.86 ¢/kWh all-in for 800 kWh = $270.86, i.e.
-// $8 fixed customer charge (up from $4 in 2026) + 800 x 32.86 ¢. Changes every quarter: update from your bill.
-#ifndef LUMA_RATE
-#define LUMA_RATE 0.3286f  // $ per kWh
+// Power company. The display shows this name ("LUMA", "PREPA", "PG&E"...): keep it short and ASCII.
+#ifndef UTILITY_NAME
+#define UTILITY_NAME "LUMA"
 #endif
-#ifndef LUMA_FIXED
-#define LUMA_FIXED 8.0f  // fixed customer charge per month ($)
+// Older secrets.h files used LUMA_RATE / LUMA_FIXED
+#if !defined(ENERGY_RATE) && defined(LUMA_RATE)
+#define ENERGY_RATE LUMA_RATE
+#endif
+#if !defined(FIXED_CHARGE) && defined(LUMA_FIXED)
+#define FIXED_CHARGE LUMA_FIXED
+#endif
+// Price per kWh bought. Default: LUMA Oct-Dec 2026 (Energy Bureau): 33.86 ¢/kWh all-in for 800 kWh = $270.86,
+// i.e. $8 fixed customer charge + 800 x 32.86 ¢. LUMA changes it every quarter: update from your bill.
+#ifndef ENERGY_RATE
+#define ENERGY_RATE 0.3286f  // $ per kWh bought
+#endif
+#ifndef FIXED_CHARGE
+#define FIXED_CHARGE 8.0f  // fixed customer charge per month ($)
+#endif
+// Price per kWh sold. Net metering (LUMA) credits exports at the same price as imports.
+#ifndef SELL_RATE
+#define SELL_RATE ENERGY_RATE
 #endif
 
-// LUMA VPP (Customer Battery Energy Sharing): what you are paid per kWh your battery sends during an event
+// VPP / battery sharing program (LUMA: Customer Battery Energy Sharing). 0 = no VPP screen and no event detection.
+#ifndef VPP_ENABLED
+#define VPP_ENABLED 1
+#endif
+// What you are paid per kWh your battery sends during an event
 #ifndef VPP_RATE
 #define VPP_RATE 1.00f
 #endif

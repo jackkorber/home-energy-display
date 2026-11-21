@@ -35,7 +35,7 @@ lv_obj_t *tv, *tileE, *tileF, *tileM, *tileV, *tileW;
 lv_obj_t *arc, *clockL, *pill, *pillDot, *pillL, *pctRow, *pctNum, *pctSign, *backupL, *flowL;
 lv_obj_t *alertRow, *alertHead, *alertL;
 lv_obj_t *nowHint;
-// Now (below energy): live power for solar, home, battery and LUMA
+// Now (below energy): live power for solar, home, battery and grid
 lv_obj_t *fT[4], *fV[4];
 // Month
 lv_obj_t *mTitle, *billRow, *billSign, *billNum, *billL, *mT[4], *mV[4], *mNetL, *mFromL, *mUp, *mDown;
@@ -82,11 +82,29 @@ void setHidden(lv_obj_t *o, bool h) {
   }
 }
 
+// Power company name (config UTILITY_NAME) and its uppercase version for the small titles
+const char *U = UTILITY_NAME;
+char U_UP[24];
+void initNames() {
+  size_t i = 0;
+  for (; U[i] && i < sizeof(U_UP) - 1; i++) U_UP[i] = (char)toupper((unsigned char)U[i]);
+  U_UP[i] = 0;
+}
+// "DE LUMA", "Comprando a LUMA"...: build a label text with the company name
+const char *withU(const char *fmt, bool upper = false) {
+  static char buf[4][48];
+  static int n = 0;
+  char *b = buf[n++ % 4];
+  snprintf(b, sizeof(buf[0]), fmt, upper ? U_UP : U);
+  return b;
+}
+int g_pages = 4;  // horizontal pages (3 without VPP)
+
 void pageDots(lv_obj_t *tile, int active) {
   lv_obj_t *row = box(tile, LV_FLEX_FLOW_ROW);
   lv_obj_set_style_pad_column(row, 10, 0);
   lv_obj_align(row, LV_ALIGN_CENTER, 0, 212);
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < g_pages; i++) {
     lv_obj_t *d = lv_obj_create(row);
     lv_obj_remove_style_all(d);
     lv_obj_set_size(d, 8, 8);
@@ -281,7 +299,7 @@ void buildEnergy(lv_obj_t *t) {
   lv_obj_set_width(alertL, 340);
   lv_obj_add_flag(alertRow, LV_OBJ_FLAG_HIDDEN);
 
-  // What's happening now (solar, home, battery, LUMA) is on the screen below: swipe up or tap here
+  // What's happening now (solar, home, battery, grid) is on the screen below: swipe up or tap here
   nowHint = label(t, &lv_font_montserrat_14, C_DIM, "AHORA " LV_SYMBOL_DOWN);
   lv_obj_set_style_pad_all(nowHint, 10, 0);
   lv_obj_align(nowHint, LV_ALIGN_CENTER, 0, 170);
@@ -299,13 +317,13 @@ void buildFlow(lv_obj_t *t) {
   lv_obj_add_event_cb(up, [](lv_event_t *) { lv_tileview_set_tile(tv, tileE, LV_ANIM_ON); }, LV_EVENT_CLICKED, nullptr);
   lv_obj_t *title = label(t, &font_ui_22, C_DIM, "AHORA");
   lv_obj_align(title, LV_ALIGN_CENTER, 0, -150);
-  static const char *const TITLES[4] = {"Solar", "Casa", "Batería", "LUMA"};
+  static const char *const TITLES[4] = {"Solar", "Casa", "Batería", ""};
   for (int i = 0; i < 4; i++) {
     lv_obj_t *row = box(t, LV_FLEX_FLOW_ROW);
     lv_obj_set_width(row, 330);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_align(row, LV_ALIGN_CENTER, 0, -82 + i * 64);
-    fT[i] = label(row, &font_ui_22, C_DIM, TITLES[i]);
+    fT[i] = label(row, &font_ui_22, C_DIM, i == 3 ? U : TITLES[i]);
     fV[i] = label(row, &font_ui_30, C_TEXT, "--");
     if (i < 3) {  // thin line between rows
       lv_obj_t *ln = lv_obj_create(t);
@@ -332,13 +350,13 @@ void buildMonth(lv_obj_t *t) {
   billL = label(t, &font_ui_22, C_DIM, "");
   lv_obj_align(billL, LV_ALIGN_CENTER, 0, -50);
 
-  static const char *const TITLES[4] = {"SOLAR", "CASA", "DE LUMA", "A LUMA"};
+  static const char *const TITLES[2] = {"SOLAR", "CASA"};
   for (int i = 0; i < 4; i++) {
     lv_obj_t *c = box(t, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_width(c, 170);
     lv_obj_set_style_pad_row(c, 0, 0);
     lv_obj_align(c, LV_ALIGN_CENTER, i % 2 ? 85 : -85, i < 2 ? 2 : 72);
-    mT[i] = label(c, &lv_font_montserrat_14, C_DIM, TITLES[i]);
+    mT[i] = label(c, &lv_font_montserrat_14, C_DIM, i < 2 ? TITLES[i] : withU(i == 2 ? "DE %s" : "A %s", true));
     mV[i] = label(c, &font_ui_30, C_TEXT, "--");
   }
   mNetL = label(t, &font_ui_22, C_DIM, "");
@@ -393,12 +411,12 @@ void buildVpp(lv_obj_t *t) {
   vNum = label(row, &font_digits_84, C_GREEN, "--");
   vL = label(t, &font_ui_22, C_GREEN, "ganado con la batería");
   lv_obj_align(vL, LV_ALIGN_CENTER, 0, -50);
-  static const char *const TITLES[2] = {"EVENTOS", "ENVIADO A LUMA"};
+  static const char *const TITLES[1] = {"EVENTOS"};
   for (int i = 0; i < 2; i++) {
     lv_obj_t *c = box(t, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_width(c, 170);
     lv_obj_align(c, LV_ALIGN_CENTER, i ? 85 : -85, 10);
-    vT[i] = label(c, &lv_font_montserrat_14, C_DIM, TITLES[i]);
+    vT[i] = label(c, &lv_font_montserrat_14, C_DIM, i ? withU("ENVIADO A %s", true) : TITLES[i]);
     vV[i] = label(c, &font_ui_30, C_TEXT, "--");
   }
   vNowL = label(t, &font_ui_22, C_DIM, "");
@@ -443,7 +461,7 @@ void buildWeather(lv_obj_t *t) {
   lv_obj_align(stormL1, LV_ALIGN_CENTER, 0, 152);
   stormL2 = label(t, &font_ui_22, C_DIM, "");
   lv_obj_align(stormL2, LV_ALIGN_CENTER, 0, 180);
-  pageDots(t, 3);
+  pageDots(t, g_pages - 1);
 }
 
 // ---------- Update ----------
@@ -462,7 +480,7 @@ void updateEnergy(const Energy &e, const Weather &w, uint32_t nowMs) {
   const bool outage = fresh && e.grid == 0;
   const bool blinkOn = (nowMs / 600) % 2;
 
-  // Status pill: LUMA / APAGÓN (outage) / connection problems
+  // Status pill: company name / APAGÓN (outage) / connection problems
   lv_color_t dot = C_DIM;
   lv_opa_t bgOpa = LV_OPA_TRANSP;
   const char *txt;
@@ -483,10 +501,10 @@ void updateEnergy(const Energy &e, const Weather &w, uint32_t nowMs) {
         dot = C_TEXT;
         bgOpa = blinkOn ? LV_OPA_COVER : LV_OPA_40;
       } else if (e.grid == 1) {
-        txt = "LUMA";
+        txt = U;
         dot = C_GREEN;
       } else {
-        txt = "LUMA: cambiando";
+        txt = withU("%s: cambiando");
         dot = C_AMBER;
       }
   }
@@ -505,7 +523,7 @@ void updateEnergy(const Energy &e, const Weather &w, uint32_t nowMs) {
   if (!lv_color_eq(lv_obj_get_style_arc_color(arc, LV_PART_INDICATOR), ac))
     lv_obj_set_style_arc_color(arc, ac, LV_PART_INDICATOR);
 
-  // How long it lasts: in an outage, from home usage minus solar; on LUMA, from home consumption
+  // How long it lasts: in an outage, from home usage minus solar; on grid, from home consumption
   b[0] = 0;
   lv_color_t bc = C_ACCENT;
   if (fresh && isfinite(e.usable_wh)) {
@@ -588,12 +606,12 @@ void updateFlow(const Energy &e, uint32_t nowMs) {
   }
 
   if (!fresh || outage) {
-    setText(fT[3], outage ? "LUMA (apagón)" : "LUMA");
+    setText(fT[3], outage ? withU("%s (apagón)") : U);
     setText(fV[3], "--");
     setColor(fV[3], outage ? C_RED : C_DIM);
   } else {
     const bool selling = e.grid_w < -50, buying = e.grid_w > 50;
-    setText(fT[3], selling ? "Vendiendo a LUMA" : buying ? "Comprando a LUMA" : "LUMA");
+    setText(fT[3], selling ? withU("Vendiendo a %s") : buying ? withU("Comprando a %s") : U);
     fmtKw(b, sizeof(b), e.grid_w);
     setText(fV[3], b);
     setColor(fV[3], selling ? C_GREEN : C_TEXT);
@@ -622,7 +640,7 @@ void updateMonth(const Energy &e) {
       setText(billL, "Esperando datos del Gateway");
       return;
     }
-    r = {e.month_key, e.m_solar, e.m_home, e.m_imp, e.m_exp, LUMA_RATE, LUMA_FIXED, e.month_from};
+    r = {e.month_key, e.m_solar, e.m_home, e.m_imp, e.m_exp, ENERGY_RATE, FIXED_CHARGE, e.month_from, SELL_RATE};
   } else {
     r = *past[mSel - 1];
   }
@@ -633,10 +651,10 @@ void updateMonth(const Energy &e) {
   setColor(mTitle, live ? C_DIM : C_ACCENT);
 
   const float net = r.imp - r.exp;  // net kWh bought (+) or sold (-)
-  const float bill = net * r.rate + r.fixed;
+  const float bill = r.imp * r.rate - r.exp * r.sell + r.fixed;
   snprintf(b, sizeof(b), "%.2f", fabsf(bill));
   setText(billNum, b);
-  if (live) setText(billL, bill >= 0 ? "a pagar a LUMA" : "de crédito con LUMA");
+  if (live) setText(billL, bill >= 0 ? withU("a pagar a %s") : withU("de crédito con %s"));
   else setText(billL, bill >= 0 ? "factura estimada" : "crédito estimado");
   setColor(billNum, bill >= 0 ? C_TEXT : C_GREEN);
   setColor(billSign, bill >= 0 ? C_DIM : C_GREEN);
@@ -649,8 +667,14 @@ void updateMonth(const Energy &e) {
     setText(mV[i], isfinite(v[i]) ? b : "--");
     setColor(mV[i], c[i]);
   }
-  if (net >= 0) snprintf(b, sizeof(b), "Neto: %d kWh de LUMA x $%.2f", (int)lroundf(net), r.rate);
-  else snprintf(b, sizeof(b), "Neto: %d kWh a LUMA x $%.2f", (int)lroundf(-net), r.rate);
+  if (fabsf(r.sell - r.rate) > 0.0005f) {  // different price for selling: show both sides
+    snprintf(b, sizeof(b), "Compra %d x $%.2f · venta %d x $%.2f", (int)lroundf(r.imp), r.rate, (int)lroundf(r.exp),
+             r.sell);
+  } else if (net >= 0) {
+    snprintf(b, sizeof(b), "Neto: %d kWh de %s x $%.2f", (int)lroundf(net), U, r.rate);
+  } else {
+    snprintf(b, sizeof(b), "Neto: %d kWh a %s x $%.2f", (int)lroundf(-net), U, r.rate);
+  }
   setText(mNetL, b);
   if (r.from > 1) snprintf(b, sizeof(b), "Contando desde el %d de %s", r.from, MONTH[(month + 11) % 12]);
   else snprintf(b, sizeof(b), "+ $%.0f cargo fijo · estimado", r.fixed);
@@ -775,6 +799,8 @@ bool important_alert(const Alert &a) {
 }
 
 void build() {
+  initNames();
+  g_pages = VPP_ENABLED ? 4 : 3;
   lv_obj_t *scr = lv_screen_active();
   lv_obj_set_style_bg_color(scr, C_BG, 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
@@ -785,8 +811,13 @@ void build() {
   tileE = lv_tileview_add_tile(tv, 0, 0, (lv_dir_t)(LV_DIR_RIGHT | LV_DIR_BOTTOM));
   tileF = lv_tileview_add_tile(tv, 0, 1, LV_DIR_TOP);  // below energy: swipe up
   tileM = lv_tileview_add_tile(tv, 1, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
+#if VPP_ENABLED
   tileV = lv_tileview_add_tile(tv, 2, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
   tileW = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
+#else
+  tileV = nullptr;
+  tileW = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT);
+#endif
   lv_obj_add_event_cb(tv, [](lv_event_t *) {
     if (lv_tileview_get_tile_active(tv) != tileM) mSel = 0;  // when returning, start at the current month
     if (lv_tileview_get_tile_active(tv) != tileV) vSel = 0;
@@ -794,7 +825,7 @@ void build() {
   buildEnergy(tileE);
   buildFlow(tileF);
   buildMonth(tileM);
-  buildVpp(tileV);
+  if (tileV) buildVpp(tileV);
   buildWeather(tileW);
 }
 
@@ -802,7 +833,7 @@ bool update(const Energy &e, const Weather &w, uint32_t nowMs) {
   updateEnergy(e, w, nowMs);
   updateFlow(e, nowMs);
   updateMonth(e);
-  updateVpp(e, nowMs);
+  if (tileV) updateVpp(e, nowMs);
   updateWeather(w, nowMs);
   bool important = e.at && nowMs - e.at < 30000 && e.grid == 0;
   for (int i = 0; i < w.n_alerts; i++) important |= important_alert(w.alerts[i]);
@@ -816,7 +847,7 @@ void shift(int dx, int dy) {
 
 void next_page() {
   lv_obj_t *cur = lv_tileview_get_tile_active(tv);
-  lv_tileview_set_tile(tv, cur == tileE || cur == tileF ? tileM : cur == tileM ? tileV : cur == tileV ? tileW : tileE, LV_ANIM_ON);
+  lv_tileview_set_tile(tv, cur == tileE || cur == tileF ? tileM : cur == tileM ? (tileV ? tileV : tileW) : cur == tileV ? tileW : tileE, LV_ANIM_ON);
 }
 
 }  // namespace ui

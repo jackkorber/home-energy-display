@@ -12,8 +12,11 @@ GW_HOST=""            # Gateway IP, e.g. 192.168.1.50 (empty = search the networ
 GW_PASSWORD=""        # Gateway "customer" password / contraseña del Gateway
 TOWN=""               # Town for weather, e.g. Ponce / pueblo para el tiempo
 POWERWALLS=""         # Number of Powerwall 2 / cantidad de Powerwall 2
-LUMA_RATE="0.3286"    # $/kWh (Oct–Dec 2026). Update from your LUMA bill / actualízalo con tu factura
-LUMA_FIXED="8"        # Fixed monthly charge / cargo fijo mensual ($)
+UTILITY_NAME="LUMA"   # Power company shown on screen / compañía de luz que sale en la pantalla
+ENERGY_RATE="0.3286"  # $/kWh bought (LUMA Oct–Dec 2026). Update from your bill / actualízalo con tu factura
+FIXED_CHARGE="8"      # Fixed monthly charge / cargo fijo mensual ($)
+SELL_RATE=""          # $/kWh sold; empty = same as ENERGY_RATE (net metering) / vacío = igual (medición neta)
+VPP="yes"             # Battery sharing program (VPP)? yes/no / ¿Programa de baterías (VPP)? yes/no
 VPP_RATE="1.00"       # $ per kWh sent during a VPP event / $ por kWh enviado en un evento VPP
 # ---------------------------------------------------------------------------------------------------------------
 # Tip: put the same variables in a file named settings.env instead (it is git-ignored), so your passwords never end
@@ -108,6 +111,13 @@ POWERWALLS="${POWERWALLS:-1}"
 case "$POWERWALLS" in ''|*[!0-9]*) die "Powerwall count must be a number" ;; esac
 BATTERY_KWH="$(python3 -c "print(13.5*$POWERWALLS)")"
 
+# ---- Prices: must be plain numbers (they go straight into C code)
+num() { case "$2" in ''|*[!0-9.]*|*.*.*) die "$1 must be a number like 0.33 (got: '$2')" ;; esac; }
+num ENERGY_RATE "$ENERGY_RATE"; num FIXED_CHARGE "$FIXED_CHARGE"; num VPP_RATE "$VPP_RATE"
+[ -z "$SELL_RATE" ] || num SELL_RATE "$SELL_RATE"
+case "$VPP" in y|Y|yes|YES|si|sí|SI|1) VPP_ENABLED=1 ;; *) VPP_ENABLED=0 ;; esac
+[ -n "$UTILITY_NAME" ] || UTILITY_NAME="LUMA"
+
 # ---- Write src/secrets.h
 HOSTS_C="$(for h in $GW_HOSTS_LIST; do printf '"%s", ' "$h"; done)"
 umask 077
@@ -120,14 +130,17 @@ umask 077
   echo "#define GW_PASSWORD \"$(cstr "$GW_PASSWORD")\""
   echo '#define GW_EMAIL "display@home.local"'
   if [ -n "$LAT" ]; then
-    echo "#define HOME_LAT ${LAT}f"
-    echo "#define HOME_LON ${LON}f"
+    echo "#define HOME_LAT ((float)${LAT})"
+    echo "#define HOME_LON ((float)${LON})"
     echo "#define HOME_NAME \"$(cstr "$NAME")\""
   fi
-  echo "#define BATTERY_KWH ${BATTERY_KWH}f"
-  echo "#define LUMA_RATE ${LUMA_RATE}f"
-  echo "#define LUMA_FIXED ${LUMA_FIXED}f"
-  echo "#define VPP_RATE ${VPP_RATE}f"
+  echo "#define BATTERY_KWH ((float)${BATTERY_KWH})"
+  echo "#define UTILITY_NAME \"$(cstr "$UTILITY_NAME")\""
+  echo "#define ENERGY_RATE ((float)${ENERGY_RATE})"
+  echo "#define FIXED_CHARGE ((float)${FIXED_CHARGE})"
+  [ -n "$SELL_RATE" ] && echo "#define SELL_RATE ((float)${SELL_RATE})"
+  echo "#define VPP_ENABLED $VPP_ENABLED"
+  echo "#define VPP_RATE ((float)${VPP_RATE})"
 } > src/secrets.h
 say "Wrote src/secrets.h"
 
