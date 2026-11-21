@@ -8,6 +8,10 @@ A round AMOLED desk display for homes in Puerto Rico with a Tesla Powerwall: bat
 
 ## Screens / Pantallas
 
+![Energía, Ahora, Mes, VPP y Tiempo](docs/screens.png)
+
+*Sample data (demo mode) / datos de ejemplo.*
+
 | | |
 |---|---|
 | **Energía** | Battery %, grid connected (shows your power company, e.g. **LUMA**) / **APAGÓN**, backup time left, active NWS alert. Swipe up for **Ahora**: live solar, home, battery and grid power. |
@@ -79,7 +83,9 @@ h <YYYYMM> <solar> <home> <bought> <sold> <rate> <fixed>  a past month
 v <YYYYMM> <events> <kWh> [<YYYY-MM-DD> <last kWh>]      VPP for a month
 ```
 
-Test commands: `o` simulate an outage, `a` simulate an alert, `n` force night mode (send again to undo).
+Test commands: `o` simulate an outage, `a` simulate an alert, `n` force night mode, `d` demo mode with sample data (send again to undo). `p<n>` jumps to a page and `s` sends a screenshot.
+
+Screenshots: `python3 tools/snap.py docs/screens --demo` saves one round PNG per page (needs `pip install pyserial pillow`).
 
 ## Privacy / Privacidad
 

@@ -99,6 +99,7 @@ const char *withU(const char *fmt, bool upper = false) {
   return b;
 }
 int g_pages = 4;  // horizontal pages (3 without VPP)
+const char *g_place = HOME_NAME;  // weather title (demo mode shows a sample town)
 
 void pageDots(lv_obj_t *tile, int active) {
   lv_obj_t *row = box(tile, LV_FLEX_FLOW_ROW);
@@ -428,7 +429,7 @@ void buildVpp(lv_obj_t *t) {
 }
 
 void buildWeather(lv_obj_t *t) {
-  wxTitle = label(t, &font_ui_22, C_DIM, HOME_NAME);
+  wxTitle = label(t, &font_ui_22, C_DIM, g_place);
   lv_obj_align(wxTitle, LV_ALIGN_CENTER, 0, -178);
 
   tempRow = box(t, LV_FLEX_FLOW_ROW);
@@ -668,7 +669,7 @@ void updateMonth(const Energy &e) {
     setColor(mV[i], c[i]);
   }
   if (fabsf(r.sell - r.rate) > 0.0005f) {  // different price for selling: show both sides
-    snprintf(b, sizeof(b), "Compra %d x $%.2f · venta %d x $%.2f", (int)lroundf(r.imp), r.rate, (int)lroundf(r.exp),
+    snprintf(b, sizeof(b), "Compra %d x $%.2f - venta %d x $%.2f", (int)lroundf(r.imp), r.rate, (int)lroundf(r.exp),
              r.sell);
   } else if (net >= 0) {
     snprintf(b, sizeof(b), "Neto: %d kWh de %s x $%.2f", (int)lroundf(net), U, r.rate);
@@ -677,7 +678,7 @@ void updateMonth(const Energy &e) {
   }
   setText(mNetL, b);
   if (r.from > 1) snprintf(b, sizeof(b), "Contando desde el %d de %s", r.from, MONTH[(month + 11) % 12]);
-  else snprintf(b, sizeof(b), "+ $%.0f cargo fijo · estimado", r.fixed);
+  else snprintf(b, sizeof(b), "+ $%.0f cargo fijo - estimado", r.fixed);
   setText(mFromL, b);
 }
 
@@ -699,8 +700,8 @@ void updateVpp(const Energy &e, uint32_t nowMs) {
     return;
   }
   const int month = r.key % 100;
-  if (live) snprintf(b, sizeof(b), "VPP · %s", MONTH_UP[(month + 11) % 12]);
-  else snprintf(b, sizeof(b), "VPP · %s %lu", MONTH_UP[(month + 11) % 12], (unsigned long)(r.key / 100));
+  if (live) snprintf(b, sizeof(b), "VPP - %s", MONTH_UP[(month + 11) % 12]);
+  else snprintf(b, sizeof(b), "VPP - %s %lu", MONTH_UP[(month + 11) % 12], (unsigned long)(r.key / 100));
   setText(vTitle, b);
   setColor(vTitle, live ? C_DIM : C_ACCENT);
   snprintf(b, sizeof(b), "%.2f", r.kwh * VPP_RATE);
@@ -714,13 +715,13 @@ void updateVpp(const Energy &e, uint32_t nowMs) {
   if (live && e.vpp_active && e.at && nowMs - e.at < 30000) {
     char kw[16];
     fmtKw(kw, sizeof(kw), e.vpp_w);
-    snprintf(b, sizeof(b), "EVENTO AHORA · %s · %.1f kWh", kw, e.vpp_event_kwh);
+    snprintf(b, sizeof(b), "EVENTO AHORA - %s - %.1f kWh", kw, e.vpp_event_kwh);
     setText(vNowL, b);
     setColor(vNowL, (nowMs / 600) % 2 ? C_GREEN : C_TEXT);
   } else if (r.last_at) {
     struct tm tm;
     localtime_r(&r.last_at, &tm);
-    snprintf(b, sizeof(b), "Último: %d %s · %.1f kWh", tm.tm_mday, MON3[tm.tm_mon], r.last_kwh);
+    snprintf(b, sizeof(b), "Último: %d %s - %.1f kWh", tm.tm_mday, MON3[tm.tm_mon], r.last_kwh);
     setText(vNowL, b);
     setColor(vNowL, C_DIM);
   } else {
@@ -736,9 +737,9 @@ void updateWeather(const Weather &w, uint32_t nowMs) {
   const bool fcFresh = w.fc_at && nowMs - w.fc_at < 60 * 60000UL;
   const bool alertsFresh = w.alerts_at && nowMs - w.alerts_at < 15 * 60000UL;
 
-  if (!w.alerts_at) snprintf(b, sizeof(b), "%s", HOME_NAME);
-  else if (!alertsFresh) snprintf(b, sizeof(b), "%s · sin internet (%lu min)", HOME_NAME, (nowMs - w.alerts_at) / 60000UL);
-  else snprintf(b, sizeof(b), "%s", HOME_NAME);
+  if (!w.alerts_at) snprintf(b, sizeof(b), "%s", g_place);
+  else if (!alertsFresh) snprintf(b, sizeof(b), "%s - sin internet (%lu min)", g_place, (nowMs - w.alerts_at) / 60000UL);
+  else snprintf(b, sizeof(b), "%s", g_place);
   setText(wxTitle, b);
   setColor(wxTitle, alertsFresh || !w.alerts_at ? C_DIM : C_AMBER);
 
@@ -747,7 +748,7 @@ void updateWeather(const Weather &w, uint32_t nowMs) {
   setText(condL, fcFresh ? sky(w.code) : "");
   b[0] = 0;
   if (fcFresh && isfinite(w.tmax) && isfinite(w.tmin)) {
-    if (w.rain >= 0) snprintf(b, sizeof(b), "%d° / %d° · lluvia %d%%", (int)lroundf(w.tmax), (int)lroundf(w.tmin), w.rain);
+    if (w.rain >= 0) snprintf(b, sizeof(b), "%d° / %d° - lluvia %d%%", (int)lroundf(w.tmax), (int)lroundf(w.tmin), w.rain);
     else snprintf(b, sizeof(b), "%d° / %d°", (int)lroundf(w.tmax), (int)lroundf(w.tmin));
   }
   setText(rangeL, b);
@@ -783,7 +784,7 @@ void updateWeather(const Weather &w, uint32_t nowMs) {
     stormName(b, sizeof(b), w.storm);
     setText(stormL1, b);
     setColor(stormL1, w.storm.dist_mi < 300 ? C_RED : w.storm.dist_mi < 800 ? C_AMBER : C_TEXT);
-    snprintf(b, sizeof(b), "%d mph · a %d mi al %s", w.storm.mph, w.storm.dist_mi, w.storm.bearing);
+    snprintf(b, sizeof(b), "%d mph - a %d mi al %s", w.storm.mph, w.storm.dist_mi, w.storm.bearing);
     setText(stormL2, b);
   }
 }
@@ -843,6 +844,14 @@ bool update(const Energy &e, const Weather &w, uint32_t nowMs) {
 void shift(int dx, int dy) {
   lv_obj_set_style_translate_x(tv, dx, 0);
   lv_obj_set_style_translate_y(tv, dy, 0);
+}
+
+void set_place(const char *name) { g_place = name; }
+
+// 0 energy, 1 "Ahora", 2 month, 3 VPP (if enabled), last = weather. No animation (for screenshots).
+void show_page(int n) {
+  lv_obj_t *t[] = {tileE, tileF, tileM, tileV ? tileV : tileW, tileW};
+  if (n >= 0 && n < 5) lv_tileview_set_tile(tv, t[n], LV_ANIM_OFF);
 }
 
 void next_page() {

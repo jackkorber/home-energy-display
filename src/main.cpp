@@ -9,6 +9,7 @@
 #include <lvgl.h>
 #include <math.h>
 #include <time.h>
+#include <mbedtls/base64.h>
 
 #include <atomic>
 
@@ -37,7 +38,7 @@ static volatile bool touchIrq = false;
 static std::atomic<uint32_t> g_lastTouchMs{0};
 static std::atomic<bool> g_screenOff{false};
 static std::atomic<bool> g_nextPage{false};
-static bool g_simOutage = false, g_simAlert = false, g_simNight = false;
+static bool g_simOutage = false, g_simAlert = false, g_simNight = false, g_demo = false;
 
 // ---------- Touch (ui task): one full sample in an atomic word (x, y, pressed, swallow) ----------
 static std::atomic<uint32_t> g_touch{0};
@@ -97,6 +98,33 @@ static void uiTask(void *) {
 // ---------- USB commands (one line each) ----------
 // "o" simulated outage, "a" simulated alert, "n" forced night (each is cleared by repeating it)
 // "m <solar> <home> <bought> <sold>": month-to-date kWh (from Netzero) so the month starts complete
+// "s": send the screen over USB as base64 RGB565 (tools/snap.py turns it into a PNG)
+static void sendSnapshot() {
+  lv_draw_buf_t *b = lv_snapshot_take(lv_screen_active(), LV_COLOR_FORMAT_RGB565);
+  if (!b) {
+    Serial.println("SNAPFAIL");
+    return;
+  }
+  g_log_mute = true;
+  delay(30);
+  Serial.setTxTimeoutMs(2000);
+  const uint32_t len = b->header.stride * b->header.h;
+  Serial.printf("\nSNAP screen %u %u %u %u\n", (unsigned)b->header.w, (unsigned)b->header.h, (unsigned)b->header.stride,
+                (unsigned)len);
+  static unsigned char out[4200];
+  for (uint32_t off = 0; off < len; off += 3072) {
+    size_t olen = 0;
+    mbedtls_base64_encode(out, sizeof(out), &olen, b->data + off, min<uint32_t>(3072, len - off));
+    Serial.write(out, olen);
+    Serial.write('\n');
+  }
+  Serial.println("ENDSNAP");
+  Serial.flush();
+  Serial.setTxTimeoutMs(0);
+  g_log_mute = false;
+  lv_draw_buf_destroy(b);
+}
+
 static void handleSerial() {
   static char buf[96];
   static uint8_t n = 0;
@@ -151,6 +179,20 @@ static void handleSerial() {
       }
       continue;
     }
+    if (buf[0] == 's') {
+      sendSnapshot();
+      continue;
+    }
+    if (buf[0] == 'p') {  // "p<n>": go to page n (0 energy, 1 now, 2 month, 3 VPP, 4 weather)
+      ui::show_page(atoi(buf + 1));
+      continue;
+    }
+    if (buf[0] == 'd') {  // demo mode: sample data instead of the real house (for screenshots)
+      g_demo = !g_demo;
+      ui::set_place(g_demo ? "San Juan" : HOME_NAME);
+      LOGF("[sim] demo=%d\n", g_demo);
+      continue;
+    }
     if (buf[0] == 'o') g_simOutage = !g_simOutage;
     else if (buf[0] == 'a') g_simAlert = !g_simAlert;
     else if (buf[0] == 'n') g_simNight = !g_simNight;
@@ -180,6 +222,50 @@ static void applySim(Energy &e, Weather &w) {
     w.n_alerts++;
     if (!w.alerts_at) w.alerts_at = millis();
   }
+}
+
+// Sample data for screenshots: nothing from the real house
+static void applyDemo(Energy &e, Weather &w) {
+  time_t t;
+  time(&t);
+  struct tm tm;
+  localtime_r(&t, &tm);
+  const uint32_t key = (tm.tm_year + 1900) * 100 + tm.tm_mon + 1;
+  e = Energy{};
+  e.status = GwStatus::OK;
+  e.at = millis();
+  e.pct = 86;
+  e.grid = 1;
+  e.solar_w = 3240;
+  e.home_w = 1120;
+  e.battery_w = -1480;
+  e.grid_w = -640;
+  e.usable_wh = 23200;
+  e.home_avg_w = 1100;
+  e.net_avg_w = -2100;
+  e.month_ok = true;
+  e.month_key = key;
+  e.month = tm.tm_mon + 1;
+  e.month_from = 1;
+  e.m_solar = 612;
+  e.m_home = 655;
+  e.m_imp = 341;
+  e.m_exp = 298;
+  e.vpp = VppRec{key, 6, 44.8f, t - 3 * 86400, 7.6f};
+  w = Weather{};
+  w.fc_at = w.alerts_at = w.storms_at = millis();
+  w.temp = 84;
+  w.code = 2;
+  w.tmax = 87;
+  w.tmin = 74;
+  w.rain = 40;
+  w.n_alerts = 1;
+  Alert &a = w.alerts[0];
+  strlcpy(a.event, "Flood Watch", sizeof(a.event));
+  strlcpy(a.severity, "Moderate", sizeof(a.severity));
+  a.ends = t + 5 * 3600;
+  a.hash = 0xD3110;
+  w.n_storms = 0;
 }
 
 static bool isNight() {
@@ -258,6 +344,7 @@ static void renderTask(void *) {
     if (now - lastUpdate >= 250) {
       lastUpdate = now;
       model::get(e, w);
+      if (g_demo) applyDemo(e, w);
       applySim(e, w);
       important = ui::update(e, w, now);
       sounds(e, w, isNight());
