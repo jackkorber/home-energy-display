@@ -23,7 +23,7 @@ Sounds when the power goes out / comes back and for new NWS warnings. At night (
 
 ## What you need / Qué necesitas
 
-- **Board:** Waveshare ESP32-S3-Touch-AMOLED-1.75C (466×466 round AMOLED, touch, speaker).
+- **Board:** Waveshare ESP32-S3-Touch-AMOLED-1.75C (466×466 round AMOLED, touch, speaker) — [buy it on Amazon / cómprala en Amazon](https://link.amazon/B08NMlQLx).
 - **Powerwall 2 / Powerwall+ with a Backup Gateway 1 or 2.** The **Powerwall 3 does not have this local API**, so it is not supported.
 - The Gateway **"customer" password** (the one for `https://<gateway-ip>`). If you never changed it, it is the **last 5 characters of the Gateway serial number**.
 - A Mac or Linux computer with `python3` and `curl`. The installer can install [PlatformIO](https://platformio.org/install/cli) for you.
