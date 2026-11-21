@@ -1,5 +1,7 @@
 # Home Energy Display (Powerwall · LUMA · VPP · Weather)
 
+[![Buy me a coffee / Invítame un café](https://img.shields.io/badge/☕_Buy_me_a_coffee-Invítame_un_café-ffdd00?logo=paypal&logoColor=003087)](https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=jackkorber%40me.com&item_name=%E2%98%95+Coffee+for+HgYperDrive&currency_code=USD&no_note=1)
+
 A round AMOLED desk display for homes in Puerto Rico with a Tesla Powerwall: battery, outages, monthly LUMA bill estimate, VPP earnings and NWS weather alerts. It reads the Powerwall **locally** from the Gateway on your Wi-Fi, so it keeps working during an outage even without internet (as long as your router is on backup power).
 
 *Pantalla redonda para casas en Puerto Rico con Powerwall: batería, apagones, estimado de la factura de LUMA, lo ganado con la VPP y avisos del tiempo. Lee el Powerwall **directo del Gateway** por tu WiFi: sigue funcionando en un apagón aunque no haya internet (si el router está en backup). La pantalla está en español.*
@@ -75,3 +77,9 @@ The Powerwall data never leaves your home network. The only internet requests ar
 ## Credits / Créditos
 
 Not affiliated with Tesla or LUMA. Local API knowledge from [pypowerwall](https://github.com/jasonacox/pypowerwall) and [vloschiavo/powerwall2](https://github.com/vloschiavo/powerwall2). Includes [SensorLib](https://github.com/lewisxhe/SensorsLib) (MIT) and Montserrat fonts (SIL OFL). Built with [LVGL](https://lvgl.io).
+
+## ☕ Support / Apoyo
+
+If this display is useful to you, you can [buy me a coffee](https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=jackkorber%40me.com&item_name=%E2%98%95+Coffee+for+HgYperDrive&currency_code=USD&no_note=1) — by [HgYperDrive](https://www.youtube.com/@HgYperdrivePR), Tesla FSD from Puerto Rico.
+
+*Si te sirve, puedes [invitarme un café](https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=jackkorber%40me.com&item_name=%E2%98%95+Coffee+for+HgYperDrive&currency_code=USD&no_note=1).*
