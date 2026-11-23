@@ -705,17 +705,54 @@ void task(void *) {
   model::put(E);
   gwTls.setInsecure();
   wxTls.setInsecure();
+  WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
+    static int last = -1;
+    const int r = info.wifi_sta_disconnected.reason;
+    if (r != last) LOGF("[net] WiFi disconnected, reason %d\n", r);  // 15 = password rejected
+    last = r;
+  }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+  LOGF("[net] WiFi MAC %s\n", WiFi.macAddress().c_str());
   configTzTime(TZ_INFO, "pool.ntp.org", "time.nist.gov");
   bool wasUp = false;
+  uint32_t lastWait = millis();
+  unsigned apTry = 0;
   for (;;) {
     const bool up = WiFi.status() == WL_CONNECTED;
+    // Not connected after 20 s: the network can have several access points with the same name, and one of them
+    // may reject the password (seen: a mesh node failing the handshake while another AP works). Try each AP
+    // with our network name in turn, strongest first.
+    if (!up && millis() - lastWait > 20000) {
+      lastWait = millis();
+      WiFi.disconnect();
+      delay(200);
+      const int n = WiFi.scanNetworks();
+      struct Ap { uint8_t bssid[6]; int ch, rssi; } aps[8];
+      int na = 0;
+      for (int i = 0; i < n && na < 8; i++) {
+        if (WiFi.SSID(i) != WIFI_SSID) continue;
+        memcpy(aps[na].bssid, WiFi.BSSID(i), 6);
+        aps[na].ch = WiFi.channel(i);
+        aps[na++].rssi = WiFi.RSSI(i);
+      }
+      WiFi.scanDelete();
+      std::sort(aps, aps + na, [](const Ap &a, const Ap &b) { return a.rssi > b.rssi; });
+      if (na == 0) {
+        LOGF("[net] WiFi \"%s\" not found, retrying\n", WIFI_SSID);
+        WiFi.begin(WIFI_SSID, WIFI_PASS);
+      } else {
+        const Ap &a = aps[apTry++ % na];
+        LOGF("[net] WiFi: trying access point %d of %d (%02X:%02X:%02X:%02X:%02X:%02X, %d dBm)\n", (int)((apTry - 1) % na) + 1,
+             na, a.bssid[0], a.bssid[1], a.bssid[2], a.bssid[3], a.bssid[4], a.bssid[5], a.rssi);
+        WiFi.begin(WIFI_SSID, WIFI_PASS, a.ch, a.bssid);
+      }
+    }
     if (up != wasUp) {
       wasUp = up;
-      LOGF("[net] WiFi %s %s\n", up ? "connected" : "disconnected", up ? WiFi.localIP().toString().c_str() : "");
+      LOGF("[net] WiFi %s %s %d dBm\n", up ? "connected" : "disconnected", up ? WiFi.localIP().toString().c_str() : "", up ? WiFi.RSSI() : 0);
       if (!up) {
         gwTls.stop();
         E.status = GwStatus::NO_WIFI;
