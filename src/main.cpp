@@ -20,6 +20,7 @@
 #include "log.h"
 #include "model.h"
 #include "net.h"
+#include "power.h"
 #include "ui.h"
 
 #define FW_VERSION "0.1.0"
@@ -90,6 +91,7 @@ static void handleBootButton() {
 static void uiTask(void *) {
   for (;;) {
     handleBootButton();
+    power::loop();
     pollTouch();
     vTaskDelay(pdMS_TO_TICKS(5));
   }
@@ -359,7 +361,9 @@ static void renderTask(void *) {
     // Brightness: fixed by day; off at night unless outage/severe alert (dim) or touched recently
     const bool night = isNight();
     const bool touched = now - g_lastTouchMs.load() < WAKE_MS;
-    const float target = touched ? BRIGHT_DAY : !night ? BRIGHT_DAY : important ? BRIGHT_NIGHT : 0;
+    const bool off = power::shutting_down();  // PWR held: show "Apagando..." and fade to black
+    if (off) ui::show_shutdown();
+    const float target = off ? 0 : touched ? BRIGHT_DAY : !night ? BRIGHT_DAY : important ? BRIGHT_NIGHT : 0;
     g_screenOff = target == 0;
     if (fabsf(bright - target) > 0.5f) {
       bright += (target - bright) * fminf(1.0f, dt * 8.0f);
@@ -402,8 +406,14 @@ void setup() {
     touch.setMirrorXY(true, true);
     attachInterrupt(TP_INT, []() { touchIrq = true; }, FALLING);
   }
+  power::begin(Wire);
   audio::begin(Wire);
   audio::setVolume(2);  // medium
+  {  // power-on sound: only when it really turned on (PWR button / plugged in / woke from deep sleep), not on resets
+    const esp_reset_reason_t why = esp_reset_reason();
+    if (why == ESP_RST_POWERON || why == ESP_RST_DEEPSLEEP) audio::play(audio::SND_POWER_ON);
+    LOGF("[boot] reset reason %d\n", (int)why);
+  }
   g_lastTouchMs = millis();
   LOGF("[boot] touch %d, audio %d\n", touchOk, audio::ok());
 

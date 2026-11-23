@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include "config.h"
+#include "power.h"
 #include "log.h"
 
 LV_FONT_DECLARE(font_digits_150);
@@ -30,7 +31,9 @@ const lv_color_t C_SOLAR = lv_color_hex(0xFFD23F);
 const lv_color_t C_AMBER = lv_color_hex(0xFFB020);
 const lv_color_t C_RED = lv_color_hex(0xFF3B3B);
 
-lv_obj_t *tv, *tileE, *tileF, *tileM, *tileV, *tileW;
+lv_obj_t *tv, *tileE, *tileF, *tileM, *tileV, *tileW, *tileD;
+// Board battery: a horizontal battery icon (different from the house ring)
+lv_obj_t *dBody, *dFill, *dNub, *dBolt, *dPct, *dSign, *dState, *dInfo, *offLayer;
 // Energy
 lv_obj_t *arc, *clockL, *pill, *pillDot, *pillL, *pctRow, *pctNum, *pctSign, *backupL, *flowL;
 lv_obj_t *alertRow, *alertHead, *alertL;
@@ -462,7 +465,7 @@ void buildWeather(lv_obj_t *t) {
   lv_obj_align(stormL1, LV_ALIGN_CENTER, 0, 152);
   stormL2 = label(t, &font_ui_22, C_DIM, "");
   lv_obj_align(stormL2, LV_ALIGN_CENTER, 0, 180);
-  pageDots(t, g_pages - 1);
+  pageDots(t, g_pages - 2);
 }
 
 // ---------- Update ----------
@@ -799,9 +802,98 @@ bool important_alert(const Alert &a) {
   return false;
 }
 
+void buildDevice(lv_obj_t *t) {
+  lv_obj_t *title = label(t, &font_ui_22, C_DIM, "ESTA PANTALLA");
+  lv_obj_align(title, LV_ALIGN_CENTER, 0, -178);
+  // Battery icon: body + terminal nub; the fill grows left to right
+  dBody = lv_obj_create(t);
+  lv_obj_remove_style_all(dBody);
+  lv_obj_set_size(dBody, 250, 116);
+  lv_obj_set_style_border_width(dBody, 6, 0);
+  lv_obj_set_style_border_color(dBody, C_DIM, 0);
+  lv_obj_set_style_radius(dBody, 20, 0);
+  lv_obj_set_style_pad_all(dBody, 8, 0);
+  lv_obj_remove_flag(dBody, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_align(dBody, LV_ALIGN_CENTER, -9, -60);
+  dNub = lv_obj_create(t);
+  lv_obj_remove_style_all(dNub);
+  lv_obj_set_size(dNub, 14, 46);
+  lv_obj_set_style_radius(dNub, 5, 0);
+  lv_obj_set_style_bg_opa(dNub, LV_OPA_COVER, 0);
+  lv_obj_set_style_bg_color(dNub, C_DIM, 0);
+  lv_obj_align_to(dNub, dBody, LV_ALIGN_OUT_RIGHT_MID, 4, 0);
+  dFill = lv_obj_create(dBody);
+  lv_obj_remove_style_all(dFill);
+  lv_obj_set_size(dFill, 0, lv_pct(100));
+  lv_obj_set_style_radius(dFill, 10, 0);
+  lv_obj_set_style_bg_opa(dFill, LV_OPA_COVER, 0);
+  lv_obj_set_style_bg_color(dFill, C_GREEN, 0);
+  lv_obj_align(dFill, LV_ALIGN_LEFT_MID, 0, 0);
+  dBolt = label(dBody, &lv_font_montserrat_40, C_TEXT, LV_SYMBOL_CHARGE);
+  lv_obj_center(dBolt);
+  lv_obj_add_flag(dBolt, LV_OBJ_FLAG_HIDDEN);
+
+  lv_obj_t *row = box(t, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
+  lv_obj_align(row, LV_ALIGN_CENTER, 0, 52);
+  dPct = label(row, &font_digits_84, C_TEXT, "--");
+  dSign = label(row, &font_tech_40, C_DIM, "%");
+  lv_obj_set_style_pad_bottom(dSign, 10, 0);
+  dState = label(t, &font_ui_22, C_DIM, "");
+  lv_obj_align(dState, LV_ALIGN_CENTER, 0, 118);
+  dInfo = label(t, &font_ui_22, C_FAINT, "");
+  lv_obj_align(dInfo, LV_ALIGN_CENTER, 0, 150);
+  lv_obj_t *hint = label(t, &lv_font_montserrat_14, C_FAINT, "PWR 2 s: APAGAR");
+  lv_obj_align(hint, LV_ALIGN_CENTER, 0, 186);
+  pageDots(t, g_pages - 1);
+}
+
+void updateDevice() {
+  const power::State p = power::get();
+  char b[48];
+  const int inner = 250 - 2 * 6 - 2 * 8;
+  if (!p.ok) {
+    setText(dPct, "--");
+    setText(dState, "No se pudo leer el chip de energía");
+    return;
+  }
+  if (!p.battery || p.pct < 0) {
+    lv_obj_set_width(dFill, 0);
+    setText(dPct, "--");
+    setText(dState, p.usb ? "Sin batería, con USB" : "Sin batería");
+    setColor(dState, C_DIM);
+    setText(dInfo, "");
+    setHidden(dBolt, !p.usb);
+    return;
+  }
+  const lv_color_t c = p.charging ? C_ACCENT : p.pct >= 50 ? C_GREEN : p.pct >= 20 ? C_AMBER : C_RED;
+  const int w = max(p.pct > 0 ? 12 : 0, inner * p.pct / 100);
+  if (lv_obj_get_width(dFill) != w) lv_obj_set_width(dFill, w);
+  if (!lv_color_eq(lv_obj_get_style_bg_color(dFill, 0), c)) lv_obj_set_style_bg_color(dFill, c, 0);
+  setHidden(dBolt, !p.charging);
+  snprintf(b, sizeof(b), "%d", p.pct);
+  setText(dPct, b);
+  if (p.charging) {
+    setText(dState, "Cargando");
+    setColor(dState, C_ACCENT);
+  } else if (p.care_paused) {
+    snprintf(b, sizeof(b), "Carga en pausa en %d%% para cuidarla", CHARGE_STOP_PCT);
+    setText(dState, b);
+    setColor(dState, C_GREEN);
+  } else if (p.usb) {
+    setText(dState, "Con USB");
+    setColor(dState, C_DIM);
+  } else {
+    setText(dState, "Usando la batería");
+    setColor(dState, C_AMBER);
+  }
+  snprintf(b, sizeof(b), "%s - %.2f V", p.usb ? "USB conectado" : "Sin USB", p.mv / 1000.0f);
+  setText(dInfo, b);
+}
+
 void build() {
   initNames();
-  g_pages = VPP_ENABLED ? 4 : 3;
+  g_pages = VPP_ENABLED ? 5 : 4;
   lv_obj_t *scr = lv_screen_active();
   lv_obj_set_style_bg_color(scr, C_BG, 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
@@ -814,10 +906,12 @@ void build() {
   tileM = lv_tileview_add_tile(tv, 1, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
 #if VPP_ENABLED
   tileV = lv_tileview_add_tile(tv, 2, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
-  tileW = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
+  tileW = lv_tileview_add_tile(tv, 3, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
+  tileD = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT);
 #else
   tileV = nullptr;
-  tileW = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT);
+  tileW = lv_tileview_add_tile(tv, 2, 0, (lv_dir_t)(LV_DIR_LEFT | LV_DIR_RIGHT));
+  tileD = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
 #endif
   lv_obj_add_event_cb(tv, [](lv_event_t *) {
     if (lv_tileview_get_tile_active(tv) != tileM) mSel = 0;  // when returning, start at the current month
@@ -828,6 +922,7 @@ void build() {
   buildMonth(tileM);
   if (tileV) buildVpp(tileV);
   buildWeather(tileW);
+  buildDevice(tileD);
 }
 
 bool update(const Energy &e, const Weather &w, uint32_t nowMs) {
@@ -836,6 +931,7 @@ bool update(const Energy &e, const Weather &w, uint32_t nowMs) {
   updateMonth(e);
   if (tileV) updateVpp(e, nowMs);
   updateWeather(w, nowMs);
+  updateDevice();
   bool important = e.at && nowMs - e.at < 30000 && e.grid == 0;
   for (int i = 0; i < w.n_alerts; i++) important |= important_alert(w.alerts[i]);
   return important;
@@ -848,15 +944,29 @@ void shift(int dx, int dy) {
 
 void set_place(const char *name) { g_place = name; }
 
+// Power-off feedback: a full-screen message on the top layer while the screen fades out
+void show_shutdown() {
+  if (offLayer) return;
+  offLayer = lv_obj_create(lv_layer_top());
+  lv_obj_remove_style_all(offLayer);
+  lv_obj_set_size(offLayer, lv_pct(100), lv_pct(100));
+  lv_obj_set_style_bg_opa(offLayer, LV_OPA_COVER, 0);
+  lv_obj_set_style_bg_color(offLayer, C_BG, 0);
+  lv_obj_t *icon = label(offLayer, &lv_font_montserrat_48, C_RED, LV_SYMBOL_POWER);
+  lv_obj_align(icon, LV_ALIGN_CENTER, 0, -30);
+  lv_obj_t *l = label(offLayer, &font_ui_30, C_TEXT, "Apagando...");
+  lv_obj_align(l, LV_ALIGN_CENTER, 0, 40);
+}
+
 // 0 energy, 1 "Ahora", 2 month, 3 VPP (if enabled), last = weather. No animation (for screenshots).
 void show_page(int n) {
-  lv_obj_t *t[] = {tileE, tileF, tileM, tileV ? tileV : tileW, tileW};
-  if (n >= 0 && n < 5) lv_tileview_set_tile(tv, t[n], LV_ANIM_OFF);
+  lv_obj_t *t[] = {tileE, tileF, tileM, tileV ? tileV : tileW, tileW, tileD};
+  if (n >= 0 && n < 6) lv_tileview_set_tile(tv, t[n], LV_ANIM_OFF);
 }
 
 void next_page() {
   lv_obj_t *cur = lv_tileview_get_tile_active(tv);
-  lv_tileview_set_tile(tv, cur == tileE || cur == tileF ? tileM : cur == tileM ? (tileV ? tileV : tileW) : cur == tileV ? tileW : tileE, LV_ANIM_ON);
+  lv_tileview_set_tile(tv, cur == tileE || cur == tileF ? tileM : cur == tileM ? (tileV ? tileV : tileW) : cur == tileV ? tileW : cur == tileW ? tileD : tileE, LV_ANIM_ON);
 }
 
 }  // namespace ui

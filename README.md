@@ -8,7 +8,7 @@ A round AMOLED desk display for homes in Puerto Rico with a Tesla Powerwall: bat
 
 ## Screens / Pantallas
 
-![Energía, Ahora, Mes, VPP y Tiempo](docs/screens.png)
+![Energía, Ahora, Mes, VPP, Tiempo y batería de la pantalla](docs/screens.png)
 
 *Sample data (demo mode) / datos de ejemplo.*
 
@@ -18,8 +18,11 @@ A round AMOLED desk display for homes in Puerto Rico with a Tesla Powerwall: bat
 | **Mes** | This month's solar, home use, kWh bought from / sold to the power company and the estimated bill or credit. Swipe up/down for past months. |
 | **VPP** *(optional)* | Battery-sharing events this month, kWh sent to the grid and $ earned. Swipe up/down for past months. Turn it off with `VPP="no"`. |
 | **Tiempo** | Temperature, forecast, NWS alerts (translated to Spanish) and the nearest tropical storm from the NHC. |
+| **Esta pantalla** | The display's own battery: charging, on USB or running on battery. On USB it stops charging at 80% and starts again below 70%, because the display lives plugged in and sitting at 100% wears the battery out. |
 
-Sounds when the power goes out / comes back and for new NWS warnings. At night (10 pm–7 am) the screen turns off unless there is an outage or a serious alert; touch to wake it.
+Sounds when the power goes out / comes back and for new NWS warnings.
+
+**Power button:** hold **PWR** for 2 seconds to turn the display off (it shows "Apagando...", plays a sound and fades out). Press PWR to turn it back on (power-on sound). If it is plugged in by USB the board cannot cut its own power, so it goes to deep sleep instead: press **BOOT** to wake it. At night (10 pm–7 am) the screen turns off unless there is an outage or a serious alert; touch to wake it.
 
 ## What you need / Qué necesitas
 
@@ -83,7 +86,7 @@ h <YYYYMM> <solar> <home> <bought> <sold> <rate> <fixed>  a past month
 v <YYYYMM> <events> <kWh> [<YYYY-MM-DD> <last kWh>]      VPP for a month
 ```
 
-Test commands: `o` simulate an outage, `a` simulate an alert, `n` force night mode, `d` demo mode with sample data (send again to undo). `p<n>` jumps to a page and `s` sends a screenshot.
+Test commands: `o` simulate an outage, `a` simulate an alert, `n` force night mode, `d` demo mode with sample data (send again to undo). `p<n>` jumps to a page (0 energy, 1 now, 2 month, 3 VPP, 4 weather, 5 display battery) and `s` sends a screenshot.
 
 Screenshots: `python3 tools/snap.py docs/screens --demo` saves one round PNG per page (needs `pip install pyserial pillow`).
 

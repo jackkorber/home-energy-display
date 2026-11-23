@@ -64,6 +64,14 @@
 #define VPP_END_W 200       // ends when sending less than this...
 #define VPP_END_MS 180000   // ...for 3 min
 
+// Board battery care: on USB, stop charging at this % and charge again below the second one
+#ifndef CHARGE_STOP_PCT
+#define CHARGE_STOP_PCT 80
+#endif
+#ifndef CHARGE_RESUME_PCT
+#define CHARGE_RESUME_PCT 70
+#endif
+
 // Night: screen off (touch wakes it) unless there is an outage or a serious alert; only critical sounds
 #ifndef NIGHT_START_H
 #define NIGHT_START_H 22

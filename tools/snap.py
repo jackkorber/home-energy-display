@@ -3,7 +3,7 @@
 
     python3 tools/snap.py <out_dir> [--demo] [pages...]
 
-pages: 0 energy, 1 now, 2 month, 3 VPP, 4 weather (default: all). --demo shows sample data instead of your house.
+pages: 0 energy, 1 now, 2 month, 3 VPP, 4 weather, 5 board battery (default: all). --demo shows sample data instead of your house.
 Needs: pip install pyserial pillow
 """
 import base64, glob, os, re, sys, time
@@ -11,7 +11,7 @@ import base64, glob, os, re, sys, time
 import serial
 from PIL import Image, ImageDraw
 
-NAMES = {0: "energy", 1: "now", 2: "month", 3: "vpp", 4: "weather"}
+NAMES = {0: "energy", 1: "now", 2: "month", 3: "vpp", 4: "weather", 5: "device"}
 
 
 def open_port():
@@ -78,7 +78,7 @@ def main():
     pages = [int(a) for a in args[1:] if a.isdigit()] or list(NAMES)
     os.makedirs(out, exist_ok=True)
     p = open_port()
-    time.sleep(1)
+    time.sleep(15)  # opening the port can reset the board: wait for it to boot and get data
     if demo:
         send(p, "d")
         time.sleep(1.5)
